@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Display Note</title>
+</head>
+<body>
+    <h1>Note Details</h1>
+    <div>
+        <p><strong>Note ID:</strong> {{ note.id }}</p>
+        <p><strong>Client ID:</strong> {{ note.client_id }}</p>
+        <p><strong>Date:</strong> {{ note.date }}</p>
+        <p><strong>Title:</strong> {{ note.title }}</p>
+        <p><strong>Content:</strong> {{ note.content }}</p>
+    </div>
+    <div>
+        <a href="/notes/search/view">Back to Search</a>
+    </div>
+</body>
+</html>

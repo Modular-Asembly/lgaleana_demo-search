@@ -25,11 +25,21 @@
           "uvicorn==0.34.0"
         ],
         "dependencies": [
-          "Every router and Base"
+          "search notes view",
+          "create notes",
+          "search notes",
+          "display one note view",
+          "get note",
+          "SQL adaptor"
         ]
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/main.py",
+          "content": "from dotenv import load_dotenv\nload_dotenv()\n\nfrom fastapi import FastAPI\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom sqlalchemy.exc import SQLAlchemyError\n\nfrom app.sql_adaptor import engine, Base\nfrom app.search_notes import router as search_notes_router\nfrom app.create_notes import router as create_notes_router\nfrom app.get_note import router as get_note_router\nfrom app.search_notes_view import router as search_notes_view_router\nfrom app.display_note_view import router as display_note_view_router\n\ndef create_app() -> FastAPI:\n    app = FastAPI(title=\"Notes Service\", description=\"FastAPI service for managing notes.\", version=\"1.0.0\")\n\n    # Add CORS middleware to allow all origins.\n    app.add_middleware(\n        CORSMiddleware,\n        allow_origins=[\"*\"],\n        allow_credentials=True,\n        allow_methods=[\"*\"],\n        allow_headers=[\"*\"],\n    )\n\n    # Include all routers from the application.\n    app.include_router(search_notes_router)\n    app.include_router(create_notes_router)\n    app.include_router(get_note_router)\n    app.include_router(search_notes_view_router)\n    app.include_router(display_note_view_router)\n\n    # Create all database tables.\n    try:\n        Base.metadata.create_all(bind=engine)\n    except SQLAlchemyError as e:\n        # Let errors raise as specified.\n        raise e\n\n    return app\n\napp = create_app()\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     },
     {
@@ -56,8 +66,13 @@
         ],
         "dependencies": []
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/sql_adaptor.py",
+          "content": "import os\nfrom typing import Generator\nfrom sqlalchemy import create_engine\nfrom sqlalchemy.orm import sessionmaker, Session, declarative_base\n\n# Retrieve the DB_URL environment variable\ndb_url = os.getenv(\"DB_URL\")\nif db_url is None:\n    raise EnvironmentError(\"DB_URL environment variable is not set.\")\nDB_URL: str = db_url\n\n# Create a SQLAlchemy engine instance using the DB_URL\nengine = create_engine(DB_URL)\n\n# Create a session factory bound to this engine\nSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)\n\n# Define the declarative base for model definitions\nBase = declarative_base()\n\ndef get_db() -> Generator[Session, None, None]:\n    \"\"\"\n    Dependency that creates a new SQLAlchemy SessionLocal object,\n    yields it for use, and ensures that it is closed after use.\n    \"\"\"\n    db: Session = SessionLocal()\n    try:\n        yield db\n    finally:\n        db.close()\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     },
     {
@@ -73,8 +88,13 @@
           "sqlalchemy==2.0.36"
         ]
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/note.py",
+          "content": "from datetime import datetime\nfrom sqlalchemy import Column, Integer, String, Text, DateTime\nfrom app.sql_adaptor import Base\n\nclass Note(Base):\n    __tablename__ = \"notes\"\n\n    id = Column(Integer, primary_key=True, index=True)\n    client_id = Column(Integer, nullable=False, index=True)\n    date = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)\n    title = Column(String(255), nullable=False, index=True)\n    content = Column(Text, nullable=True)\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     },
     {
@@ -90,12 +110,17 @@
           "sqlalchemy==2.0.36"
         ],
         "dependencies": [
-          "SQL adaptor",
-          "Note"
+          "Note",
+          "SQL adaptor"
         ]
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/search_notes.py",
+          "content": "from datetime import datetime\nfrom typing import List, Optional\n\nfrom fastapi import APIRouter, Depends, Query, status\nfrom sqlalchemy.orm import Session\nfrom sqlalchemy import and_\n\nfrom app.sql_adaptor import get_db\nfrom app.note import Note\n\nrouter = APIRouter()\n\n@router.get(\"/notes/search\", status_code=status.HTTP_200_OK)\ndef search_notes(\n    client_id: Optional[int] = Query(None, description=\"Filter by client ID\"),\n    start_date: Optional[datetime] = Query(None, description=\"Filter by start date (inclusive)\"),\n    end_date: Optional[datetime] = Query(None, description=\"Filter by end date (inclusive)\"),\n    db: Session = Depends(get_db)\n) -> List[dict]:\n    filters = []\n    if client_id is not None:\n        filters.append(Note.client_id == client_id)\n    if start_date is not None:\n        filters.append(Note.date >= start_date)\n    if end_date is not None:\n        filters.append(Note.date <= end_date)\n\n    query = db.query(Note)\n    if filters:\n        query = query.filter(and_(*filters))\n        \n    notes = query.all()\n    \n    result = [\n        {\n            \"id\": note.id,\n            \"client_id\": note.client_id,\n            \"date\": note.date,\n            \"title\": note.title,\n            \"content\": note.content\n        }\n        for note in notes\n    ]\n    return result\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     },
     {
@@ -111,12 +136,17 @@
           "sqlalchemy==2.0.36"
         ],
         "dependencies": [
-          "SQL adaptor",
-          "Note"
+          "Note",
+          "SQL adaptor"
         ]
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/create_notes.py",
+          "content": "from datetime import datetime\nfrom fastapi import APIRouter, Depends, HTTPException, status\nfrom sqlalchemy.orm import Session\nfrom pydantic import BaseModel, Field\nfrom app.sql_adaptor import get_db\nfrom app.note import Note\n\nrouter = APIRouter()\n\nclass CreateNoteRequest(BaseModel):\n    client_id: int = Field(..., description=\"Client's identifier\")\n    date: datetime = Field(default_factory=datetime.utcnow, description=\"Date of the note\")\n    title: str = Field(..., description=\"Title of the note\")\n    content: str = Field(None, description=\"Content of the note\")\n\n@router.post(\"/notes\", status_code=status.HTTP_201_CREATED)\ndef create_note(note_in: CreateNoteRequest, db: Session = Depends(get_db)) -> dict:\n    # Create a new Note instance using the provided data\n    new_note = Note(\n        client_id=note_in.client_id,\n        date=note_in.date,\n        title=note_in.title,\n        content=note_in.content\n    )\n    db.add(new_note)\n    db.commit()\n    db.refresh(new_note)\n    # Return the created note details as a dict\n    return {\n        \"id\": new_note.id,\n        \"client_id\": new_note.client_id,\n        \"date\": new_note.date,\n        \"title\": new_note.title,\n        \"content\": new_note.content\n    }\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     },
     {
@@ -129,8 +159,17 @@
         ],
         "endpoint": "search notes"
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/search_notes_view.py",
+          "content": "from fastapi import APIRouter, Request, Depends, Form, HTTPException\nfrom fastapi.responses import HTMLResponse\nfrom fastapi.templating import Jinja2Templates\nfrom datetime import datetime\nfrom typing import Optional, List\nfrom sqlalchemy.orm import Session\n\nfrom app.sql_adaptor import get_db\nfrom app.note import Note\nfrom sqlalchemy import and_\nfrom fastapi.concurrency import run_in_threadpool\n\nrouter = APIRouter()\ntemplates = Jinja2Templates(directory=\"app/templates\")\n\ndef search_notes_logic(\n    db: Session, \n    client_id: Optional[int], \n    start_date: Optional[datetime], \n    end_date: Optional[datetime]\n) -> List[dict]:\n    filters = []\n    if client_id is not None:\n        filters.append(Note.client_id == client_id)\n    if start_date is not None:\n        filters.append(Note.date >= start_date)\n    if end_date is not None:\n        filters.append(Note.date <= end_date)\n    \n    query = db.query(Note)\n    if filters:\n        query = query.filter(and_(*filters))\n    notes = query.all()\n    result = [\n        {\n            \"id\": note.id,\n            \"client_id\": note.client_id,\n            \"date\": note.date,\n            \"title\": note.title,\n            \"content\": note.content\n        }\n        for note in notes\n    ]\n    return result\n\nasync def run_search_notes(\n    db: Session, \n    client_id: Optional[int], \n    start_date: Optional[datetime], \n    end_date: Optional[datetime]\n) -> List[dict]:\n    return await run_in_threadpool(search_notes_logic, db, client_id, start_date, end_date)\n\n@router.get(\"/notes/search/view\", response_class=HTMLResponse)\nasync def get_search_notes_view(request: Request):\n    # Render the template with no search results initially\n    return templates.TemplateResponse(\"search_notes.html\", {\"request\": request, \"results\": None})\n\n@router.post(\"/notes/search/view\", response_class=HTMLResponse)\nasync def post_search_notes_view(\n    request: Request,\n    client_id: Optional[int] = Form(None),\n    start_date: Optional[str] = Form(None),\n    end_date: Optional[str] = Form(None),\n    db: Session = Depends(get_db)\n):\n    # Convert form date strings to datetime objects if provided.\n    try:\n        start_dt = datetime.fromisoformat(start_date) if start_date else None\n    except ValueError:\n        raise HTTPException(status_code=400, detail=\"Invalid format for start date. Use ISO format (YYYY-MM-DDTHH:MM:SS).\")\n    try:\n        end_dt = datetime.fromisoformat(end_date) if end_date else None\n    except ValueError:\n        raise HTTPException(status_code=400, detail=\"Invalid format for end date. Use ISO format (YYYY-MM-DDTHH:MM:SS).\")\n    \n    results = await run_search_notes(db, client_id, start_dt, end_dt)\n    return templates.TemplateResponse(\"search_notes.html\", {\"request\": request, \"results\": results})\n"
+        },
+        {
+          "path": "app/templates/search_notes.html",
+          "content": "<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Search Notes</title>\n</head>\n<body>\n    <h1>Search Notes</h1>\n    <form method=\"post\" action=\"/notes/search/view\">\n        <div>\n            <label for=\"client_id\">Client ID:</label>\n            <input type=\"number\" id=\"client_id\" name=\"client_id\" placeholder=\"Enter client ID\">\n        </div>\n        <div>\n            <label for=\"start_date\">Start Date (ISO format):</label>\n            <input type=\"text\" id=\"start_date\" name=\"start_date\" placeholder=\"YYYY-MM-DDTHH:MM:SS\">\n        </div>\n        <div>\n            <label for=\"end_date\">End Date (ISO format):</label>\n            <input type=\"text\" id=\"end_date\" name=\"end_date\" placeholder=\"YYYY-MM-DDTHH:MM:SS\">\n        </div>\n        <div>\n            <button type=\"submit\">Search</button>\n        </div>\n    </form>\n\n    {% if results is not none %}\n        <h2>Search Results:</h2>\n        {% if results %}\n            <ul>\n                {% for note in results %}\n                    <li>\n                        <a href=\"/notes/{{ note.id }}\">Note {{ note.id }} - {{ note.title }}</a><br>\n                        Client ID: {{ note.client_id }}<br>\n                        Date: {{ note.date }}<br>\n                        Content: {{ note.content }}\n                    </li>\n                {% endfor %}\n            </ul>\n        {% else %}\n            <p>No results found.</p>\n        {% endif %}\n    {% endif %}\n</body>\n</html>\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     },
     {
@@ -146,12 +185,17 @@
           "sqlalchemy==2.0.36"
         ],
         "dependencies": [
-          "SQL adaptor",
-          "Note"
+          "Note",
+          "SQL adaptor"
         ]
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/get_note.py",
+          "content": "from fastapi import APIRouter, Depends, HTTPException, status\nfrom sqlalchemy.orm import Session\nfrom app.sql_adaptor import get_db\nfrom app.note import Note\n\nrouter = APIRouter()\n\n@router.get(\"/notes/{note_id}\")\ndef get_note(note_id: int, db: Session = Depends(get_db)) -> dict:\n    note = db.query(Note).filter(Note.id == note_id).first()\n    if note is None:\n        raise HTTPException(\n            status_code=status.HTTP_404_NOT_FOUND,\n            detail=f\"Note with id {note_id} not found.\"\n        )\n    return {\n        \"id\": note.id,\n        \"client_id\": note.client_id,\n        \"date\": note.date,\n        \"title\": note.title,\n        \"content\": note.content\n    }\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     },
     {
@@ -164,8 +208,17 @@
         ],
         "endpoint": "get note"
       },
-      "files": [],
-      "update_status": "to_update",
+      "files": [
+        {
+          "path": "app/display_note_view.py",
+          "content": "from fastapi import APIRouter, Depends, HTTPException, Request\nfrom fastapi.templating import Jinja2Templates\nfrom fastapi.responses import HTMLResponse\nfrom sqlalchemy.orm import Session\n\nfrom app.sql_adaptor import get_db\nfrom app.note import Note\n\nrouter = APIRouter()\ntemplates = Jinja2Templates(directory=\"app/templates\")\n\n@router.get(\"/notes/{note_id}/view\", response_class=HTMLResponse)\ndef display_note_view(note_id: int, request: Request, db: Session = Depends(get_db)):\n    note = db.query(Note).filter(Note.id == note_id).first()\n    if not note:\n        raise HTTPException(status_code=404, detail=f\"Note with id {note_id} not found.\")\n    return templates.TemplateResponse(\"display_note.html\", {\"request\": request, \"note\": note})\n"
+        },
+        {
+          "path": "app/templates/display_note.html",
+          "content": "<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Display Note</title>\n</head>\n<body>\n    <h1>Note Details</h1>\n    <div>\n        <p><strong>Note ID:</strong> {{ note.id }}</p>\n        <p><strong>Client ID:</strong> {{ note.client_id }}</p>\n        <p><strong>Date:</strong> {{ note.date }}</p>\n        <p><strong>Title:</strong> {{ note.title }}</p>\n        <p><strong>Content:</strong> {{ note.content }}</p>\n    </div>\n    <div>\n        <a href=\"/notes/search/view\">Back to Search</a>\n    </div>\n</body>\n</html>\n"
+        }
+      ],
+      "update_status": "up_to_date",
       "is_deployed": false
     }
   ],

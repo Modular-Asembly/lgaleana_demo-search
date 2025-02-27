@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Search Notes</title>
+</head>
+<body>
+    <h1>Search Notes</h1>
+    <form method="post" action="/notes/search/view">
+        <div>
+            <label for="client_id">Client ID:</label>
+            <input type="number" id="client_id" name="client_id" placeholder="Enter client ID">
+        </div>
+        <div>
+            <label for="start_date">Start Date (ISO format):</label>
+            <input type="text" id="start_date" name="start_date" placeholder="YYYY-MM-DDTHH:MM:SS">
+        </div>
+        <div>
+            <label for="end_date">End Date (ISO format):</label>
+            <input type="text" id="end_date" name="end_date" placeholder="YYYY-MM-DDTHH:MM:SS">
+        </div>
+        <div>
+            <button type="submit">Search</button>
+        </div>
+    </form>
+
+    {% if results is not none %}
+        <h2>Search Results:</h2>
+        {% if results %}
+            <ul>
+                {% for note in results %}
+                    <li>
+                        <a href="/notes/{{ note.id }}">Note {{ note.id }} - {{ note.title }}</a><br>
+                        Client ID: {{ note.client_id }}<br>
+                        Date: {{ note.date }}<br>
+                        Content: {{ note.content }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No results found.</p>
+        {% endif %}
+    {% endif %}
+</body>
+</html>
