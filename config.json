@@ -31,6 +31,142 @@
       "files": [],
       "update_status": "to_update",
       "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "infrastructure",
+        "name": "Cloud SQL Database",
+        "details": ""
+      },
+      "files": [],
+      "update_status": "up_to_date",
+      "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "module",
+        "name": "SQL adaptor",
+        "details": "Defines the classic FastAPI SQL utility.\n\nConnects to a database.\nDefines Base.\nDefines a method that returns sessions. This method is used by the FastAPI endpoints.",
+        "env_variables": [
+          "DB_URL"
+        ],
+        "packages": [
+          "psycopg2-binary==2.9.10",
+          "sqlalchemy==2.0.36"
+        ],
+        "dependencies": []
+      },
+      "files": [],
+      "update_status": "to_update",
+      "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "datamodel",
+        "name": "Note",
+        "details": "Defines a SQLAlchemy model for 'Note' with the following fields: id (primary key, integer), client_id (integer, represents the id of the client), date (datetime), and additional fields such as title (string) and content (text). This model is designed to be used with the FastAPI endpoints via dependency injection from the SQL adaptor.",
+        "dependencies": [
+          "SQL adaptor"
+        ],
+        "packages": [
+          "psycopg2-binary==2.9.10",
+          "sqlalchemy==2.0.36"
+        ]
+      },
+      "files": [],
+      "update_status": "to_update",
+      "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "endpoint",
+        "name": "search notes",
+        "details": "Creates an endpoint to search for notes based on query parameters such as client_id or date range (all optional).",
+        "env_variables": [
+          "DB_URL"
+        ],
+        "packages": [
+          "fastapi==0.115.6",
+          "sqlalchemy==2.0.36"
+        ],
+        "dependencies": [
+          "SQL adaptor",
+          "Note"
+        ]
+      },
+      "files": [],
+      "update_status": "to_update",
+      "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "endpoint",
+        "name": "create notes",
+        "details": "Creates an endpoint to create new notes. The endpoint accepts request payload containing note fields such as client_id, date, title, and content. It uses SQL adaptor to obtain a session and performs the insert operation on the Note datamodel. Proper input validation and error handling are performed.",
+        "env_variables": [
+          "DB_URL"
+        ],
+        "packages": [
+          "fastapi==0.115.6",
+          "sqlalchemy==2.0.36"
+        ],
+        "dependencies": [
+          "SQL adaptor",
+          "Note"
+        ]
+      },
+      "files": [],
+      "update_status": "to_update",
+      "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "view",
+        "name": "search notes view",
+        "details": "Creates a Jinja2 template to render an HTML page for searching notes. It provides an interface for users to input search parameters (e.g., client ID or date rante, all optional) and displays the list of search results.\nWhen display th eresults, link to the note view.",
+        "packages": [
+          "jinja2==3.1.2"
+        ],
+        "endpoint": "search notes"
+      },
+      "files": [],
+      "update_status": "to_update",
+      "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "endpoint",
+        "name": "get note",
+        "details": "Creates an endpoint to retrieve a single note by its id. The endpoint uses the SQL adaptor to obtain a session and queries the Note datamodel to return the note details. It includes proper error handling if the note is not found.",
+        "env_variables": [
+          "DB_URL"
+        ],
+        "packages": [
+          "fastapi==0.115.6",
+          "sqlalchemy==2.0.36"
+        ],
+        "dependencies": [
+          "SQL adaptor",
+          "Note"
+        ]
+      },
+      "files": [],
+      "update_status": "to_update",
+      "is_deployed": false
+    },
+    {
+      "design": {
+        "type": "view",
+        "name": "display one note view",
+        "details": "Creates a Jinja2 template to render an HTML page that displays the details of a single note. It provides an interface to view note attributes such as client_id, date, title, and content. The view integrates with the 'get note' endpoint to fetch and display the note details.",
+        "packages": [
+          "jinja2==3.1.2"
+        ],
+        "endpoint": "get note"
+      },
+      "files": [],
+      "update_status": "to_update",
+      "is_deployed": false
     }
   ],
   "github": "https://github.com/Modular-Asembly/lgaleana_demo-search"
